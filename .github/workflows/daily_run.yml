@@ -1,0 +1,52 @@
+name: JPM Data Pipeline Daily Run
+
+on:
+  schedule:
+    # 每天 UTC 00:00 (北京时间早上8点) 自动运行
+    - cron: '0 0 * * *'
+  # 允许你手动点击按钮立刻运行 (方便测试)
+  workflow_dispatch:
+
+# 【关键修改】赋予 Action 写入权限，否则无法保存生成的 CSV
+permissions:
+  contents: write
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. 检出代码
+      - name: Checkout content
+        uses: actions/checkout@v3
+
+      # 2. 安装 Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      # 3. 安装依赖库 (pandas, yfinance 等)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      # 4. 下载 TextBlob 需要的语料库
+      - name: Download NLTK data
+        run: |
+          python -m textblob.download_corpora
+
+      # 5. 运行你的主程序
+      - name: Run Data Pipeline
+        run: python main_pipeline.py
+        
+      # 6. 提交并保存生成的数据 CSV
+      - name: Commit and Push Data
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          # 注意：这里要和 main_pipeline.py 里生成的最终文件名一致
+          git add JPM_Final_Features.csv
+          git commit -m "Auto-update JPM data features" || echo "No changes to commit"
+          git push
